@@ -1,0 +1,17 @@
+{
+  "name": "Coins Champignons",
+  "short_name": "Coins",
+  "description": "Carnet de POI pour retrouver ses coins à champignons.",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#f6f4ef",
+  "theme_color": "#23382f",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
