@@ -1,15 +1,18 @@
 :root {
   color-scheme: light;
-  --bg: #f6f4ef;
+  --bg: #eef4e8;
   --surface: #ffffff;
-  --ink: #18241f;
-  --muted: #66736b;
-  --line: #d8d7ce;
-  --brand: #23382f;
-  --brand-2: #8f3f2f;
-  --accent: #d3a847;
-  --soft: #e7ebe1;
-  --danger: #9f2e2e;
+  --ink: #183126;
+  --muted: #5e7468;
+  --line: #cfdbc9;
+  --brand: #24523d;
+  --brand-2: #6b4a2e;
+  --accent: #d59b2f;
+  --leaf: #6f9d57;
+  --moss: #dfead6;
+  --fern: #c6dcb9;
+  --soft: #edf5e8;
+  --danger: #9f342d;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
@@ -21,7 +24,8 @@ body {
   margin: 0;
   min-height: 100vh;
   background:
-    linear-gradient(180deg, rgba(35, 56, 47, 0.12), transparent 280px),
+    radial-gradient(circle at 18% 0%, rgba(111, 157, 87, 0.24), transparent 260px),
+    linear-gradient(180deg, rgba(36, 82, 61, 0.14), transparent 310px),
     var(--bg);
   color: var(--ink);
 }
@@ -85,7 +89,7 @@ p {
 }
 
 .eyebrow {
-  color: var(--brand-2);
+  color: var(--leaf);
   font-size: 0.78rem;
   font-weight: 800;
   text-transform: uppercase;
@@ -115,7 +119,8 @@ h3 {
   padding: 4px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.58);
+  background: rgba(255, 255, 255, 0.66);
+  box-shadow: 0 12px 32px rgba(36, 82, 61, 0.08);
 }
 
 .tab {
@@ -145,10 +150,11 @@ h3 {
   padding: 18px;
   border-radius: 8px;
   background:
-    linear-gradient(135deg, rgba(35, 56, 47, 0.92), rgba(80, 94, 65, 0.78)),
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='240' viewBox='0 0 600 240'%3E%3Cg fill='none' stroke='%23f4ead6' stroke-opacity='.24' stroke-width='2'%3E%3Cpath d='M36 202c48-78 110-102 188-72 48 18 80 16 118-10 62-42 126-36 210 18'/%3E%3Cpath d='M58 128c28-36 60-48 96-34 22 8 36 26 40 54M378 160c5-52 34-80 86-84 45-3 76 18 94 64'/%3E%3C/g%3E%3C/svg%3E");
+    linear-gradient(135deg, rgba(21, 63, 43, 0.94), rgba(64, 111, 72, 0.82)),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='680' height='260' viewBox='0 0 680 260'%3E%3Cg fill='none' stroke='%23f4ead6' stroke-opacity='.22' stroke-width='2'%3E%3Cpath d='M26 220c58-84 132-108 224-72 56 22 98 18 144-14 70-48 146-42 246 22'/%3E%3Cpath d='M78 170c34-54 76-76 126-66 44 9 68 42 70 98M428 194c4-74 42-116 114-124 56-6 98 20 126 78'/%3E%3Cpath d='M132 210c-18-54-2-90 48-108M518 214c-6-46 12-76 54-90'/%3E%3C/g%3E%3Cg fill='%23dfead6' fill-opacity='.18'%3E%3Cellipse cx='118' cy='84' rx='54' ry='15' transform='rotate(-24 118 84)'/%3E%3Cellipse cx='556' cy='78' rx='66' ry='18' transform='rotate(18 556 78)'/%3E%3C/g%3E%3C/svg%3E");
   background-size: cover;
   color: white;
+  box-shadow: 0 18px 44px rgba(24, 49, 38, 0.18);
 }
 
 .hero p {
@@ -176,7 +182,7 @@ textarea {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: var(--surface);
+  background: rgba(255, 255, 255, 0.92);
   color: var(--ink);
   padding: 13px 12px;
   outline: none;
@@ -185,7 +191,7 @@ textarea {
 input:focus,
 textarea:focus {
   border-color: var(--brand);
-  box-shadow: 0 0 0 3px rgba(35, 56, 47, 0.13);
+  box-shadow: 0 0 0 3px rgba(36, 82, 61, 0.15);
 }
 
 textarea {
@@ -211,7 +217,8 @@ textarea {
   padding: 14px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: var(--soft);
+  background:
+    linear-gradient(135deg, rgba(237, 245, 232, 0.96), rgba(223, 234, 214, 0.96));
 }
 
 .voice-box p,
@@ -244,9 +251,10 @@ textarea {
 
 .primary-button,
 .primary-link {
-  background: var(--brand);
+  background: linear-gradient(135deg, var(--brand), #376d49);
   color: white;
   padding: 0 15px;
+  box-shadow: 0 10px 22px rgba(36, 82, 61, 0.18);
 }
 
 .secondary-button,
@@ -301,6 +309,7 @@ textarea {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--surface);
+  box-shadow: 0 12px 30px rgba(36, 82, 61, 0.08);
 }
 
 .spot-photo {
@@ -308,7 +317,9 @@ textarea {
   height: 100%;
   min-height: 164px;
   object-fit: cover;
-  background: linear-gradient(135deg, var(--soft), #f2e5c3);
+  background:
+    linear-gradient(135deg, rgba(223, 234, 214, 0.95), rgba(198, 220, 185, 0.88)),
+    radial-gradient(circle at 45% 35%, rgba(213, 155, 47, 0.35), transparent 32%);
 }
 
 .spot-body {
@@ -342,7 +353,7 @@ textarea {
   text-align: center;
   border: 1px dashed var(--line);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.58);
+  background: rgba(255, 255, 255, 0.68);
 }
 
 .is-recording {
