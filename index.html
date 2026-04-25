@@ -46,6 +46,16 @@
             <input id="titleInput" name="title" type="text" autocomplete="off" placeholder="Ex. Chênes au-dessus du chemin">
           </label>
 
+          <label>
+            Type de champignon
+            <select id="categoryInput" name="category" required>
+              <option value="cepe">Cèpe</option>
+              <option value="girolle">Girolle</option>
+              <option value="morille">Morille</option>
+              <option value="autre">Autre</option>
+            </select>
+          </label>
+
           <div class="split">
             <label>
               Latitude
@@ -113,6 +123,13 @@
         </div>
         <div class="search-row">
           <input id="searchInput" type="search" placeholder="Rechercher un coin, une note, une date...">
+          <select id="categoryFilter" aria-label="Filtrer par type de champignon">
+            <option value="all">Tous les types</option>
+            <option value="cepe">Cèpes</option>
+            <option value="girolle">Girolles</option>
+            <option value="morille">Morilles</option>
+            <option value="autre">Autres</option>
+          </select>
         </div>
         <ol class="spot-list" id="spotList"></ol>
         <div class="empty-state" id="emptyState">
@@ -133,6 +150,7 @@
             </button>
           </div>
           <p class="spot-meta"></p>
+          <span class="spot-category"></span>
           <p class="spot-comment"></p>
           <audio class="spot-audio" controls hidden></audio>
           <div class="spot-actions">
@@ -140,6 +158,10 @@
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11 22 2l-9 19-2-8-8-2Z"></path></svg>
               Itinéraire
             </a>
+            <button class="secondary-button share-button" type="button">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"></path><path d="M16 6 12 2 8 6M12 2v13"></path></svg>
+              Partager
+            </button>
             <a class="secondary-link map-link" target="_blank" rel="noopener">Voir sur Google Maps</a>
           </div>
         </div>

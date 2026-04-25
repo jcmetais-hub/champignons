@@ -32,6 +32,7 @@ body {
 
 button,
 input,
+select,
 textarea {
   font: inherit;
 }
@@ -178,6 +179,7 @@ label,
 }
 
 input,
+select,
 textarea {
   width: 100%;
   border: 1px solid var(--line);
@@ -196,6 +198,18 @@ textarea:focus {
 
 textarea {
   resize: vertical;
+}
+
+select {
+  appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--brand) 50%),
+    linear-gradient(135deg, var(--brand) 50%, transparent 50%);
+  background-position:
+    calc(100% - 18px) 52%,
+    calc(100% - 12px) 52%;
+  background-size: 6px 6px;
+  background-repeat: no-repeat;
 }
 
 .split {
@@ -291,6 +305,9 @@ textarea {
 }
 
 .search-row {
+  display: grid;
+  grid-template-columns: 1fr 170px;
+  gap: 10px;
   margin-bottom: 14px;
 }
 
@@ -339,6 +356,16 @@ textarea {
   overflow: hidden;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
+}
+
+.spot-category {
+  width: fit-content;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: var(--moss);
+  color: var(--brand);
+  font-size: 0.78rem;
+  font-weight: 850;
 }
 
 .spot-actions {
@@ -392,7 +419,15 @@ textarea {
     grid-template-columns: 1fr;
   }
 
+  .search-row {
+    grid-template-columns: 1fr;
+  }
+
   .spot-actions a {
+    flex: 1 1 100%;
+  }
+
+  .spot-actions button {
     flex: 1 1 100%;
   }
 }

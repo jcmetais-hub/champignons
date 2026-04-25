@@ -9,6 +9,7 @@ const elements = {
   locateButton: document.querySelector("#locateButton"),
   positionStatus: document.querySelector("#positionStatus"),
   titleInput: document.querySelector("#titleInput"),
+  categoryInput: document.querySelector("#categoryInput"),
   latInput: document.querySelector("#latInput"),
   lngInput: document.querySelector("#lngInput"),
   dateInput: document.querySelector("#dateInput"),
@@ -24,6 +25,7 @@ const elements = {
   emptyState: document.querySelector("#emptyState"),
   template: document.querySelector("#spotTemplate"),
   searchInput: document.querySelector("#searchInput"),
+  categoryFilter: document.querySelector("#categoryFilter"),
   exportButton: document.querySelector("#exportButton"),
   importInput: document.querySelector("#importInput"),
   installButton: document.querySelector("#installButton")
@@ -36,6 +38,13 @@ let audioBlob = null;
 let recorder = null;
 let recordedChunks = [];
 let deferredInstallPrompt = null;
+
+const categoryLabels = {
+  cepe: "Cèpe",
+  girolle: "Girolle",
+  morille: "Morille",
+  autre: "Autre"
+};
 
 init();
 
@@ -58,6 +67,7 @@ function bindEvents() {
   elements.resetButton.addEventListener("click", resetForm);
   elements.form.addEventListener("submit", saveSpot);
   elements.searchInput.addEventListener("input", renderSpots);
+  elements.categoryFilter.addEventListener("change", renderSpots);
   elements.exportButton.addEventListener("click", exportSpots);
   elements.importInput.addEventListener("change", importSpots);
 
@@ -216,6 +226,7 @@ async function saveSpot(event) {
   const spot = {
     id: crypto.randomUUID(),
     title: elements.titleInput.value.trim() || "Coin sans nom",
+    category: elements.categoryInput.value,
     latitude,
     longitude,
     date: elements.dateInput.value,
@@ -246,9 +257,11 @@ function resetForm() {
 
 function renderSpots() {
   const query = elements.searchInput.value.trim().toLowerCase();
+  const selectedCategory = elements.categoryFilter.value;
   const filtered = spots.filter((spot) => {
-    const text = `${spot.title} ${spot.comment} ${formatDate(spot.date)} ${spot.latitude} ${spot.longitude}`.toLowerCase();
-    return text.includes(query);
+    const category = spot.category || "autre";
+    const text = `${spot.title} ${categoryLabels[category]} ${spot.comment} ${formatDate(spot.date)} ${spot.latitude} ${spot.longitude}`.toLowerCase();
+    return text.includes(query) && (selectedCategory === "all" || category === selectedCategory);
   });
 
   elements.spotList.replaceChildren();
@@ -260,14 +273,18 @@ function renderSpots() {
     const photo = node.querySelector(".spot-photo");
     const title = node.querySelector("h3");
     const meta = node.querySelector(".spot-meta");
+    const category = node.querySelector(".spot-category");
     const comment = node.querySelector(".spot-comment");
     const audio = node.querySelector(".spot-audio");
     const routeLink = node.querySelector(".route-link");
     const mapLink = node.querySelector(".map-link");
+    const shareButton = node.querySelector(".share-button");
     const deleteButton = node.querySelector(".delete-button");
 
+    const categoryValue = spot.category || "autre";
     title.textContent = spot.title;
     meta.textContent = `${formatDate(spot.date)} • ${spot.latitude.toFixed(6)}, ${spot.longitude.toFixed(6)}`;
+    category.textContent = categoryLabels[categoryValue] || categoryLabels.autre;
     comment.textContent = spot.comment || "Aucun commentaire";
 
     if (spot.photo) {
@@ -286,6 +303,8 @@ function renderSpots() {
     routeLink.href = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination)}&travelmode=walking`;
     mapLink.href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(destination)}`;
 
+    shareButton.addEventListener("click", () => shareSpot(spot));
+
     deleteButton.addEventListener("click", async () => {
       if (!confirm(`Supprimer "${spot.title}" ?`)) return;
       await deleteSpot(spot.id);
@@ -297,35 +316,52 @@ function renderSpots() {
 }
 
 async function exportSpots() {
-  const serializable = await Promise.all(spots.map(async (spot) => ({
-    ...spot,
-    photo: spot.photo ? await blobToDataUrl(spot.photo) : null,
-    audio: spot.audio ? await blobToDataUrl(spot.audio) : null
-  })));
+  const serializable = await Promise.all(spots.map(serializeSpot));
 
   const blob = new Blob([JSON.stringify(serializable, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `coins-champignons-${new Date().toISOString().slice(0, 10)}.json`;
-  link.click();
-  URL.revokeObjectURL(url);
+  downloadBlob(blob, `coins-champignons-${new Date().toISOString().slice(0, 10)}.json`);
 }
 
 async function importSpots() {
   const file = elements.importInput.files?.[0];
   if (!file) return;
 
-  const data = JSON.parse(await file.text());
+  const parsed = JSON.parse(await file.text());
+  const data = Array.isArray(parsed) ? parsed : [parsed];
+
   for (const rawSpot of data) {
     await putSpot({
       ...rawSpot,
+      category: rawSpot.category || "autre",
       photo: rawSpot.photo ? dataUrlToBlob(rawSpot.photo) : null,
       audio: rawSpot.audio ? dataUrlToBlob(rawSpot.audio) : null
     });
   }
   elements.importInput.value = "";
   await loadSpots();
+}
+
+async function shareSpot(spot) {
+  const exportedSpot = await serializeSpot(spot);
+  const fileName = safeFileName(`poi-${spot.title}-${spot.date || spot.createdAt}.json`);
+  const json = JSON.stringify([exportedSpot], null, 2);
+  const blob = new Blob([json], { type: "application/json" });
+  const file = new File([blob], fileName, { type: "application/json" });
+  const destination = `${spot.latitude},${spot.longitude}`;
+  const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(destination)}`;
+  const shareData = {
+    title: `POI champignon - ${spot.title}`,
+    text: `${spot.title} (${categoryLabels[spot.category || "autre"]})\n${formatDate(spot.date)}\n${mapsUrl}`,
+    files: [file]
+  };
+
+  if (navigator.canShare?.(shareData)) {
+    await navigator.share(shareData);
+    return;
+  }
+
+  downloadBlob(blob, fileName);
+  window.location.href = `mailto:?subject=${encodeURIComponent(`POI champignon - ${spot.title}`)}&body=${encodeURIComponent(`J'ai exporté un POI depuis l'application Coins Champignons.\n\n${spot.title}\nType : ${categoryLabels[spot.category || "autre"]}\nCarte : ${mapsUrl}\n\nJoins le fichier JSON téléchargé à ce mail pour que le destinataire puisse l'importer.`)}`;
 }
 
 function blobToDataUrl(blob) {
@@ -335,6 +371,32 @@ function blobToDataUrl(blob) {
     reader.onerror = () => reject(reader.error);
     reader.readAsDataURL(blob);
   });
+}
+
+async function serializeSpot(spot) {
+  return {
+    ...spot,
+    photo: spot.photo ? await blobToDataUrl(spot.photo) : null,
+    audio: spot.audio ? await blobToDataUrl(spot.audio) : null
+  };
+}
+
+function downloadBlob(blob, fileName) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function safeFileName(value) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9.-]+/gi, "-")
+    .replace(/^-+|-+$/g, "")
+    .toLowerCase();
 }
 
 function dataUrlToBlob(dataUrl) {
