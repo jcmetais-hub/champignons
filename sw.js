@@ -1,9 +1,10 @@
-const CACHE_NAME = "coins-champignons-v1";
+const CACHE_NAME = "coins-champignons-v3";
 const ASSETS = [
   "./",
   "./index.html",
   "./styles.css",
   "./app.js",
+  "./supabase-config.js",
   "./manifest.webmanifest",
   "./icon.svg"
 ];

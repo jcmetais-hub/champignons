@@ -26,6 +26,7 @@
       <nav class="tabs" aria-label="Vues">
         <button class="tab is-active" type="button" data-view="captureView">Saisie</button>
         <button class="tab" type="button" data-view="spotsView">Mes coins</button>
+        <button class="tab" type="button" data-view="accountView">Compte</button>
       </nav>
 
       <section class="view is-active" id="captureView" aria-labelledby="captureTitle">
@@ -140,6 +141,51 @@
         <div class="empty-state" id="emptyState">
           <strong>Aucun coin enregistré</strong>
           <p>Capture ta position sur le terrain, ajoute une photo ou un mémo, puis retrouve l’itinéraire quand tu veux.</p>
+        </div>
+      </section>
+
+      <section class="view" id="accountView" aria-labelledby="accountTitle">
+        <div class="account-panel">
+          <div>
+            <h2 id="accountTitle">Compte</h2>
+            <p id="authStatus">Mode local actif</p>
+          </div>
+
+          <form id="authForm" class="form-grid">
+            <label>
+              Email
+              <input id="emailInput" name="email" type="email" autocomplete="email" placeholder="nom@exemple.fr">
+            </label>
+            <label>
+              Mot de passe
+              <input id="passwordInput" name="password" type="password" autocomplete="current-password" minlength="6">
+            </label>
+            <div class="actions">
+              <button class="primary-button" id="signInButton" type="button">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path><path d="M10 17l5-5-5-5M15 12H3"></path></svg>
+                Connexion
+              </button>
+              <button class="secondary-button" id="signUpButton" type="button">Créer un compte</button>
+            </div>
+          </form>
+
+          <div class="account-card" id="signedInPanel" hidden>
+            <p>Connecté avec <strong id="userEmail"></strong></p>
+            <div class="account-actions">
+              <button class="primary-button" id="syncButton" type="button">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 0 1-15.5 6.2L3 16"></path><path d="M3 21v-5h5"></path><path d="M3 12a9 9 0 0 1 15.5-6.2L21 8"></path><path d="M21 3v5h-5"></path></svg>
+                Synchroniser
+              </button>
+              <button class="secondary-button" id="signOutButton" type="button">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><path d="M16 17l5-5-5-5M21 12H9"></path></svg>
+                Déconnexion
+              </button>
+            </div>
+          </div>
+
+          <p class="account-note">
+            Le compte prépare la synchronisation cloud. Les POI restent sauvegardés localement tant que la base Supabase n'est pas branchée.
+          </p>
         </div>
       </section>
     </main>

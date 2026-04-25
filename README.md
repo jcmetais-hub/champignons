@@ -12,6 +12,7 @@ Application web installable pour enregistrer des POI de cueillette avec :
 - sauvegarde locale dans le navigateur ;
 - export/import JSON ;
 - partage d'un POI par la feuille de partage iOS, avec Mail possible ;
+- création de compte et connexion via Supabase ;
 - bouton d'itinéraire vers Google Maps.
 
 ## Lancer en local
@@ -50,10 +51,49 @@ Le destinataire peut ensuite utiliser le bouton d'import dans son application po
 
 Quand la position GPS est capturée, l'application tente de retrouver la commune à partir des coordonnées. Cette recherche nécessite une connexion réseau. Si la commune n'est pas trouvée, le champ reste modifiable manuellement.
 
+## Activer les comptes
+
+Créer un projet Supabase, puis ouvrir `supabase-config.js` et renseigner :
+
+```js
+export const SUPABASE_URL = "https://votre-projet.supabase.co";
+export const SUPABASE_ANON_KEY = "votre-cle-publique-anon";
+```
+
+Ensuite, héberger l'application en HTTPS. L'onglet "Compte" permettra de créer un compte, se connecter et se déconnecter.
+
+## Créer la base Supabase
+
+Dans Supabase :
+
+1. Ouvrir le projet.
+2. Aller dans "SQL Editor".
+3. Créer une nouvelle requête.
+4. Coller le contenu de `supabase-schema.sql`.
+5. Exécuter la requête.
+
+Le script crée :
+
+- la table `pois` ;
+- la table `poi_shares` pour le partage entre comptes ;
+- les règles de sécurité RLS ;
+- les buckets privés `poi-photos` et `poi-audio`.
+
+L'application sait maintenant utiliser ces tables quand `supabase-config.js` est renseigné :
+
+- création de compte et connexion ;
+- synchronisation manuelle depuis l'onglet "Compte" ;
+- envoi automatique des nouveaux POI connectés ;
+- upload des photos dans `poi-photos` ;
+- upload des mémos vocaux dans `poi-audio` ;
+- récupération des POI cloud au démarrage et après connexion.
+
 ## Fichiers
 
 - `index.html` : structure de l'application.
 - `styles.css` : interface responsive mobile.
-- `app.js` : GPS, photo, audio, catégories, sauvegarde IndexedDB, partage, export/import, liens Google Maps.
+- `app.js` : GPS, photo, audio, catégories, compte, sauvegarde IndexedDB, partage, export/import, liens Google Maps.
+- `supabase-config.js` : configuration Supabase.
+- `supabase-schema.sql` : création des tables, règles de sécurité et espaces de stockage Supabase.
 - `manifest.webmanifest` et `sw.js` : installation PWA et cache hors ligne.
 - `server.js` : mini serveur local de test.

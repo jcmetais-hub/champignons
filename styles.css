@@ -67,7 +67,9 @@ svg {
 .spot-actions,
 .actions,
 .toolbar,
-.voice-box {
+.voice-box,
+.account-card,
+.account-actions {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -114,7 +116,7 @@ h3 {
 
 .tabs {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 6px;
   margin: 22px 0;
   padding: 4px;
@@ -167,6 +169,40 @@ h3 {
   display: grid;
   gap: 15px;
   margin-top: 18px;
+}
+
+.account-panel {
+  display: grid;
+  gap: 18px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: 0 12px 30px rgba(36, 82, 61, 0.08);
+}
+
+.account-panel > div:first-child {
+  display: grid;
+  gap: 7px;
+}
+
+.account-panel p,
+.account-note {
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.account-card {
+  justify-content: space-between;
+  flex-wrap: wrap;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--soft);
+}
+
+.account-actions {
+  flex-wrap: wrap;
 }
 
 label,
