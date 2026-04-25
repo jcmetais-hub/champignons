@@ -69,10 +69,15 @@ svg {
 .toolbar,
 .voice-box,
 .account-card,
-.account-actions {
+.account-actions,
+.top-actions {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.topbar {
+  align-items: flex-start;
 }
 
 .topbar,
@@ -103,6 +108,67 @@ h1 {
   margin-top: 2px;
   font-size: 1.9rem;
   line-height: 1.05;
+}
+
+.title-block {
+  min-width: 0;
+}
+
+.top-actions {
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  max-width: 156px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.status-pill span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--muted);
+  flex: 0 0 auto;
+}
+
+.status-pill.is-online {
+  color: var(--brand);
+  border-color: rgba(36, 82, 61, 0.28);
+}
+
+.status-pill.is-online .status-dot {
+  background: #3aa467;
+}
+
+.status-pill.is-syncing .status-dot {
+  background: var(--accent);
+}
+
+.status-pill.is-error {
+  color: var(--danger);
+  border-color: rgba(159, 52, 45, 0.28);
+}
+
+.status-pill.is-error .status-dot {
+  background: var(--danger);
 }
 
 h2 {
@@ -437,6 +503,15 @@ select {
   .hero {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .topbar {
+    gap: 10px;
+  }
+
+  .status-pill {
+    max-width: 118px;
+    padding: 0 8px;
   }
 
   .split,

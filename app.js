@@ -1,4 +1,4 @@
-import { SUPABASE_ANON_KEY, SUPABASE_URL } from "./supabase-config.js";
+﻿import { SUPABASE_ANON_KEY, SUPABASE_URL } from "./supabase-config.js";
 
 const DB_NAME = "mushroom-poi-db";
 const DB_VERSION = 1;
@@ -32,6 +32,8 @@ const elements = {
   categoryFilter: document.querySelector("#categoryFilter"),
   exportButton: document.querySelector("#exportButton"),
   importInput: document.querySelector("#importInput"),
+  connectionStatus: document.querySelector("#connectionStatus"),
+  connectionStatusText: document.querySelector("#connectionStatusText"),
   authStatus: document.querySelector("#authStatus"),
   authForm: document.querySelector("#authForm"),
   emailInput: document.querySelector("#emailInput"),
@@ -54,9 +56,10 @@ let recordedChunks = [];
 let deferredInstallPrompt = null;
 let supabase = null;
 let currentUser = null;
+let lastSyncAt = null;
 
 const categoryLabels = {
-  cepe: "Cèpe",
+  cepe: "CÃ¨pe",
   girolle: "Girolle",
   morille: "Morille",
   autre: "Autre"
@@ -87,6 +90,7 @@ function bindEvents() {
   elements.categoryFilter.addEventListener("change", renderSpots);
   elements.exportButton.addEventListener("click", exportSpots);
   elements.importInput.addEventListener("change", importSpots);
+  elements.connectionStatus.addEventListener("click", () => switchView("accountView"));
   elements.signInButton.addEventListener("click", signIn);
   elements.signUpButton.addEventListener("click", signUp);
   elements.signOutButton.addEventListener("click", signOut);
@@ -109,38 +113,47 @@ function bindEvents() {
 
 async function initAuth() {
   if (!isSupabaseConfigured()) {
-    setAuthStatus("Mode local actif, Supabase non configuré");
+    setAuthStatus("Mode local actif, Supabase non configurÃ©");
+    setConnectionStatus("local", "Local", "Supabase n'est pas configuré. Les POI restent sur cet appareil.");
     setSignedInUi(null);
     return;
   }
 
   try {
+    setConnectionStatus("syncing", "Base...", "Connexion à Supabase en cours");
     const { createClient } = await import(SUPABASE_JS_URL);
     supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     const { data, error } = await supabase.auth.getUser();
-    if (error) throw error;
+    if (error && !isMissingSessionError(error)) throw error;
 
-    currentUser = data.user;
+    currentUser = data?.user || null;
     setSignedInUi(currentUser);
-    setAuthStatus(currentUser ? "Connecté" : "Prêt à se connecter");
+    setAuthStatus(currentUser ? "ConnectÃ©" : "PrÃªt Ã  se connecter");
+    updateConnectionStatus();
 
     supabase.auth.onAuthStateChange((_event, session) => {
       currentUser = session?.user || null;
       setSignedInUi(currentUser);
-      setAuthStatus(currentUser ? "Connecté" : "Déconnecté");
+      setAuthStatus(currentUser ? "ConnectÃ©" : "DÃ©connectÃ©");
+      updateConnectionStatus();
       if (currentUser) syncCloud();
     });
 
     if (currentUser) await syncCloud();
-  } catch {
-    setAuthStatus("Connexion Supabase indisponible");
+  } catch (error) {
+    setAuthStatus(`Supabase indisponible : ${error.message || "erreur de chargement"}`);
+    setConnectionStatus("error", "Base KO", error.message || "Connexion Supabase impossible");
     setSignedInUi(null);
   }
 }
 
 function isSupabaseConfigured() {
-  return SUPABASE_URL.startsWith("https://") && SUPABASE_ANON_KEY.length > 20;
+  return /^https:\/\/[a-z0-9-]+\.supabase\.co\/?$/.test(SUPABASE_URL) && SUPABASE_ANON_KEY.length > 20;
+}
+
+function isMissingSessionError(error) {
+  return error?.name === "AuthSessionMissingError" || /session.*missing/i.test(error?.message || "");
 }
 
 async function signIn() {
@@ -154,7 +167,7 @@ async function signIn() {
 
   setAuthStatus("Connexion en cours...");
   const { error } = await supabase.auth.signInWithPassword(credentials);
-  setAuthStatus(error ? error.message : "Connecté");
+  setAuthStatus(error ? error.message : "ConnectÃ©");
 }
 
 async function signUp() {
@@ -166,37 +179,42 @@ async function signUp() {
   const credentials = getCredentials();
   if (!credentials) return;
 
-  setAuthStatus("Création du compte...");
+  setAuthStatus("CrÃ©ation du compte...");
   const { data, error } = await supabase.auth.signUp(credentials);
   if (error) {
     setAuthStatus(error.message);
     return;
   }
 
-  setAuthStatus(data.session ? "Compte créé et connecté" : "Compte créé, vérifie l'email de confirmation");
+  setAuthStatus(data.session ? "Compte crÃ©Ã© et connectÃ©" : "Compte crÃ©Ã©, vÃ©rifie l'email de confirmation");
 }
 
 async function signOut() {
   if (!supabase) return;
-  setAuthStatus("Déconnexion...");
+  setAuthStatus("DÃ©connexion...");
   const { error } = await supabase.auth.signOut();
-  setAuthStatus(error ? error.message : "Déconnecté");
+  setAuthStatus(error ? error.message : "DÃ©connectÃ©");
 }
 
 async function syncCloud() {
   if (!supabase || !currentUser) {
-    setAuthStatus("Connexion nécessaire pour synchroniser");
+    setAuthStatus("Connexion nÃ©cessaire pour synchroniser");
+    updateConnectionStatus();
     return;
   }
 
   try {
     setAuthStatus("Synchronisation en cours...");
+    setConnectionStatus("syncing", "Synchro...", "Synchronisation cloud en cours");
     await pushPendingSpots();
     await pullCloudSpots();
     await loadSpots();
-    setAuthStatus("Synchronisation terminée");
+    lastSyncAt = new Date();
+    setAuthStatus("Synchronisation terminÃ©e");
+    updateConnectionStatus();
   } catch (error) {
-    setAuthStatus(`Synchronisation impossible : ${error.message || "erreur réseau"}`);
+    setAuthStatus(`Synchronisation impossible : ${error.message || "erreur rÃ©seau"}`);
+    setConnectionStatus("error", "Synchro KO", error.message || "Synchronisation impossible");
   }
 }
 
@@ -314,16 +332,68 @@ function getCredentials() {
   const password = elements.passwordInput.value;
 
   if (!email || !password) {
-    setAuthStatus("Email et mot de passe nécessaires");
+    setAuthStatus("Email et mot de passe nÃ©cessaires");
     return null;
   }
 
   if (password.length < 6) {
-    setAuthStatus("Mot de passe : 6 caractères minimum");
+    setAuthStatus("Mot de passe : 6 caractÃ¨res minimum");
     return null;
   }
 
   return { email, password };
+}
+
+async function signIn() {
+  if (!supabase) {
+    setAuthStatus("Supabase n'est pas prÃªt. VÃ©rifie supabase-config.js et recharge la page.");
+    return;
+  }
+
+  const credentials = getCredentials();
+  if (!credentials) return;
+
+  setAuthStatus("Connexion en cours...");
+  try {
+    const { error } = await supabase.auth.signInWithPassword(credentials);
+    setAuthStatus(error ? error.message : "ConnectÃ©");
+  } catch (error) {
+    setAuthStatus(`Connexion impossible : ${error.message || "erreur rÃ©seau"}`);
+  }
+}
+
+async function signUp() {
+  if (!supabase) {
+    setAuthStatus("Supabase n'est pas prÃªt. VÃ©rifie supabase-config.js et recharge la page.");
+    return;
+  }
+
+  const credentials = getCredentials();
+  if (!credentials) return;
+
+  setAuthStatus("CrÃ©ation du compte...");
+  try {
+    const { data, error } = await supabase.auth.signUp(credentials);
+    if (error) {
+      setAuthStatus(error.message);
+      return;
+    }
+
+    setAuthStatus(data.session ? "Compte crÃ©Ã© et connectÃ©" : "Compte crÃ©Ã©, vÃ©rifie l'email de confirmation");
+  } catch (error) {
+    setAuthStatus(`CrÃ©ation impossible : ${error.message || "erreur rÃ©seau"}`);
+  }
+}
+
+async function signOut() {
+  if (!supabase) return;
+  setAuthStatus("DÃ©connexion...");
+  try {
+    const { error } = await supabase.auth.signOut();
+    setAuthStatus(error ? error.message : "DÃ©connectÃ©");
+  } catch (error) {
+    setAuthStatus(`DÃ©connexion impossible : ${error.message || "erreur rÃ©seau"}`);
+  }
 }
 
 function setAuthStatus(message) {
@@ -334,6 +404,29 @@ function setSignedInUi(user) {
   elements.authForm.hidden = Boolean(user);
   elements.signedInPanel.hidden = !user;
   elements.userEmail.textContent = user?.email || "";
+}
+
+function updateConnectionStatus() {
+  if (!supabase) {
+    setConnectionStatus("local", "Local", "Mode local actif");
+    return;
+  }
+
+  if (!currentUser) {
+    setConnectionStatus("local", "Non connecté", "Base Supabase prête, compte non connecté");
+    return;
+  }
+
+  const syncTime = lastSyncAt?.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+  const text = syncTime ? `Sync ${syncTime}` : "Connecté";
+  const title = syncTime ? `Connecté à Supabase. Dernière synchronisation à ${syncTime}` : "Connecté à Supabase";
+  setConnectionStatus("online", text, title);
+}
+
+function setConnectionStatus(status, text, title) {
+  elements.connectionStatus.className = `status-pill is-${status}`;
+  elements.connectionStatusText.textContent = text;
+  elements.connectionStatus.title = title;
 }
 
 function openDb() {
@@ -408,11 +501,11 @@ function capturePosition() {
       const { latitude, longitude, accuracy } = position.coords;
       elements.latInput.value = latitude.toFixed(6);
       elements.lngInput.value = longitude.toFixed(6);
-      elements.positionStatus.textContent = `Position capturée, précision ${Math.round(accuracy)} m`;
+      elements.positionStatus.textContent = `Position capturÃ©e, prÃ©cision ${Math.round(accuracy)} m`;
       fillCommune(latitude, longitude);
     },
     () => {
-      elements.positionStatus.textContent = "Impossible de récupérer la position";
+      elements.positionStatus.textContent = "Impossible de rÃ©cupÃ©rer la position";
     },
     { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 }
   );
@@ -454,16 +547,16 @@ async function toggleRecording() {
       audioBlob = new Blob(recordedChunks, { type: recorder.mimeType || "audio/webm" });
       elements.audioPreview.src = URL.createObjectURL(audioBlob);
       elements.audioPreview.hidden = false;
-      elements.voiceStatus.textContent = "Mémo vocal prêt";
+      elements.voiceStatus.textContent = "MÃ©mo vocal prÃªt";
       elements.recordButton.classList.remove("is-recording");
       elements.recordButton.innerHTML = `${micIcon()} Enregistrer`;
     };
     recorder.start();
     elements.voiceStatus.textContent = "Enregistrement en cours...";
     elements.recordButton.classList.add("is-recording");
-    elements.recordButton.innerHTML = `${stopIcon()} Arrêter`;
+    elements.recordButton.innerHTML = `${stopIcon()} ArrÃªter`;
   } catch {
-    elements.voiceStatus.textContent = "Autorisation micro refusée";
+    elements.voiceStatus.textContent = "Autorisation micro refusÃ©e";
   }
 }
 
@@ -492,9 +585,9 @@ async function saveSpot(event) {
   if (currentUser) {
     try {
       await putSpot(await uploadSpotToCloud(spot));
-      setAuthStatus("POI sauvegardé et synchronisé");
+      setAuthStatus("POI sauvegardÃ© et synchronisÃ©");
     } catch {
-      setAuthStatus("POI sauvegardé localement, synchronisation en attente");
+      setAuthStatus("POI sauvegardÃ© localement, synchronisation en attente");
     }
   }
   await loadSpots();
@@ -511,8 +604,8 @@ function resetForm() {
   elements.photoPreview.removeAttribute("src");
   elements.audioPreview.hidden = true;
   elements.audioPreview.removeAttribute("src");
-  elements.positionStatus.textContent = "Position non capturée";
-  elements.voiceStatus.textContent = "Aucun mémo enregistré";
+  elements.positionStatus.textContent = "Position non capturÃ©e";
+  elements.voiceStatus.textContent = "Aucun mÃ©mo enregistrÃ©";
 }
 
 function renderSpots() {
@@ -543,7 +636,7 @@ function renderSpots() {
 
     const categoryValue = spot.category || "autre";
     title.textContent = spot.title;
-    meta.textContent = `${formatDate(spot.date)} • ${spot.commune ? `${spot.commune} • ` : ""}${spot.latitude.toFixed(6)}, ${spot.longitude.toFixed(6)}`;
+    meta.textContent = `${formatDate(spot.date)} â€¢ ${spot.commune ? `${spot.commune} â€¢ ` : ""}${spot.latitude.toFixed(6)}, ${spot.longitude.toFixed(6)}`;
     category.textContent = categoryLabels[categoryValue] || categoryLabels.autre;
     comment.textContent = spot.comment || "Aucun commentaire";
 
@@ -604,7 +697,7 @@ async function importSpots() {
       try {
         await putSpot(await uploadSpotToCloud(spot));
       } catch {
-        setAuthStatus("Import local terminé, synchronisation partielle");
+        setAuthStatus("Import local terminÃ©, synchronisation partielle");
       }
     }
   }
@@ -615,7 +708,7 @@ async function importSpots() {
 async function deleteCloudSpot(spot) {
   if (!supabase || !currentUser || spot.userId !== currentUser.id) return;
   const { error } = await supabase.from("pois").delete().eq("id", spot.id);
-  if (error) setAuthStatus("Suppression cloud impossible, suppression locale effectuée");
+  if (error) setAuthStatus("Suppression cloud impossible, suppression locale effectuÃ©e");
 }
 
 async function shareSpot(spot) {
@@ -638,7 +731,7 @@ async function shareSpot(spot) {
   }
 
   downloadBlob(blob, fileName);
-  window.location.href = `mailto:?subject=${encodeURIComponent(`POI champignon - ${spot.title}`)}&body=${encodeURIComponent(`J'ai exporté un POI depuis l'application Coins Champignons.\n\n${spot.title}\nType : ${categoryLabels[spot.category || "autre"]}\nCommune : ${spot.commune || "non renseignée"}\nCarte : ${mapsUrl}\n\nJoins le fichier JSON téléchargé à ce mail pour que le destinataire puisse l'importer.`)}`;
+  window.location.href = `mailto:?subject=${encodeURIComponent(`POI champignon - ${spot.title}`)}&body=${encodeURIComponent(`J'ai exportÃ© un POI depuis l'application Coins Champignons.\n\n${spot.title}\nType : ${categoryLabels[spot.category || "autre"]}\nCommune : ${spot.commune || "non renseignÃ©e"}\nCarte : ${mapsUrl}\n\nJoins le fichier JSON tÃ©lÃ©chargÃ© Ã  ce mail pour que le destinataire puisse l'importer.`)}`;
 }
 
 async function fillCommune(latitude, longitude) {
@@ -647,9 +740,9 @@ async function fillCommune(latitude, longitude) {
   try {
     const commune = await reverseGeocodeCommune(latitude, longitude);
     elements.communeInput.value = commune || "";
-    elements.communeInput.placeholder = commune ? "Commune" : "Commune introuvable, à saisir";
+    elements.communeInput.placeholder = commune ? "Commune" : "Commune introuvable, Ã  saisir";
   } catch {
-    elements.communeInput.placeholder = "Commune indisponible, à saisir";
+    elements.communeInput.placeholder = "Commune indisponible, Ã  saisir";
   }
 }
 
@@ -770,3 +863,4 @@ function micIcon() {
 function stopIcon() {
   return '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10"></rect></svg>';
 }
+

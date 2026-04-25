@@ -14,13 +14,19 @@
   <body>
     <main class="app-shell">
       <header class="topbar">
-        <div>
+        <div class="title-block">
           <p class="eyebrow">Carnet de terrain</p>
           <h1>Coins champignons</h1>
         </div>
-        <button class="icon-button" id="installButton" type="button" hidden aria-label="Installer">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14"></path></svg>
-        </button>
+        <div class="top-actions">
+          <button class="status-pill is-local" id="connectionStatus" type="button" aria-label="État connexion et synchronisation">
+            <span class="status-dot" aria-hidden="true"></span>
+            <span id="connectionStatusText">Local</span>
+          </button>
+          <button class="icon-button" id="installButton" type="button" hidden aria-label="Installer">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14"></path></svg>
+          </button>
+        </div>
       </header>
 
       <nav class="tabs" aria-label="Vues">
