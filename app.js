@@ -1,6 +1,9 @@
+import { SUPABASE_ANON_KEY, SUPABASE_URL } from "./supabase-config.js";
+
 const DB_NAME = "mushroom-poi-db";
 const DB_VERSION = 1;
 const STORE = "spots";
+const SUPABASE_JS_URL = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
 const elements = {
   tabs: document.querySelectorAll(".tab"),
@@ -29,6 +32,16 @@ const elements = {
   categoryFilter: document.querySelector("#categoryFilter"),
   exportButton: document.querySelector("#exportButton"),
   importInput: document.querySelector("#importInput"),
+  authStatus: document.querySelector("#authStatus"),
+  authForm: document.querySelector("#authForm"),
+  emailInput: document.querySelector("#emailInput"),
+  passwordInput: document.querySelector("#passwordInput"),
+  signInButton: document.querySelector("#signInButton"),
+  signUpButton: document.querySelector("#signUpButton"),
+  signOutButton: document.querySelector("#signOutButton"),
+  syncButton: document.querySelector("#syncButton"),
+  signedInPanel: document.querySelector("#signedInPanel"),
+  userEmail: document.querySelector("#userEmail"),
   installButton: document.querySelector("#installButton")
 };
 
@@ -39,6 +52,8 @@ let audioBlob = null;
 let recorder = null;
 let recordedChunks = [];
 let deferredInstallPrompt = null;
+let supabase = null;
+let currentUser = null;
 
 const categoryLabels = {
   cepe: "Cèpe",
@@ -54,6 +69,7 @@ async function init() {
   setDefaultDate();
   await loadSpots();
   bindEvents();
+  await initAuth();
   registerServiceWorker();
 }
 
@@ -71,6 +87,10 @@ function bindEvents() {
   elements.categoryFilter.addEventListener("change", renderSpots);
   elements.exportButton.addEventListener("click", exportSpots);
   elements.importInput.addEventListener("change", importSpots);
+  elements.signInButton.addEventListener("click", signIn);
+  elements.signUpButton.addEventListener("click", signUp);
+  elements.signOutButton.addEventListener("click", signOut);
+  elements.syncButton.addEventListener("click", syncCloud);
 
   window.addEventListener("beforeinstallprompt", (event) => {
     event.preventDefault();
@@ -85,6 +105,235 @@ function bindEvents() {
     deferredInstallPrompt = null;
     elements.installButton.hidden = true;
   });
+}
+
+async function initAuth() {
+  if (!isSupabaseConfigured()) {
+    setAuthStatus("Mode local actif, Supabase non configuré");
+    setSignedInUi(null);
+    return;
+  }
+
+  try {
+    const { createClient } = await import(SUPABASE_JS_URL);
+    supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    const { data, error } = await supabase.auth.getUser();
+    if (error) throw error;
+
+    currentUser = data.user;
+    setSignedInUi(currentUser);
+    setAuthStatus(currentUser ? "Connecté" : "Prêt à se connecter");
+
+    supabase.auth.onAuthStateChange((_event, session) => {
+      currentUser = session?.user || null;
+      setSignedInUi(currentUser);
+      setAuthStatus(currentUser ? "Connecté" : "Déconnecté");
+      if (currentUser) syncCloud();
+    });
+
+    if (currentUser) await syncCloud();
+  } catch {
+    setAuthStatus("Connexion Supabase indisponible");
+    setSignedInUi(null);
+  }
+}
+
+function isSupabaseConfigured() {
+  return SUPABASE_URL.startsWith("https://") && SUPABASE_ANON_KEY.length > 20;
+}
+
+async function signIn() {
+  if (!supabase) {
+    setAuthStatus("Renseigne d'abord supabase-config.js");
+    return;
+  }
+
+  const credentials = getCredentials();
+  if (!credentials) return;
+
+  setAuthStatus("Connexion en cours...");
+  const { error } = await supabase.auth.signInWithPassword(credentials);
+  setAuthStatus(error ? error.message : "Connecté");
+}
+
+async function signUp() {
+  if (!supabase) {
+    setAuthStatus("Renseigne d'abord supabase-config.js");
+    return;
+  }
+
+  const credentials = getCredentials();
+  if (!credentials) return;
+
+  setAuthStatus("Création du compte...");
+  const { data, error } = await supabase.auth.signUp(credentials);
+  if (error) {
+    setAuthStatus(error.message);
+    return;
+  }
+
+  setAuthStatus(data.session ? "Compte créé et connecté" : "Compte créé, vérifie l'email de confirmation");
+}
+
+async function signOut() {
+  if (!supabase) return;
+  setAuthStatus("Déconnexion...");
+  const { error } = await supabase.auth.signOut();
+  setAuthStatus(error ? error.message : "Déconnecté");
+}
+
+async function syncCloud() {
+  if (!supabase || !currentUser) {
+    setAuthStatus("Connexion nécessaire pour synchroniser");
+    return;
+  }
+
+  try {
+    setAuthStatus("Synchronisation en cours...");
+    await pushPendingSpots();
+    await pullCloudSpots();
+    await loadSpots();
+    setAuthStatus("Synchronisation terminée");
+  } catch (error) {
+    setAuthStatus(`Synchronisation impossible : ${error.message || "erreur réseau"}`);
+  }
+}
+
+async function pushPendingSpots() {
+  const localSpots = await getAllSpots();
+  for (const spot of localSpots) {
+    if (spot.syncedAt && spot.userId === currentUser.id) continue;
+    const syncedSpot = await uploadSpotToCloud(spot);
+    await putSpot(syncedSpot);
+  }
+}
+
+async function pullCloudSpots() {
+  const { data, error } = await supabase
+    .from("pois")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+
+  const localSpots = await getAllSpots();
+  const localById = new Map(localSpots.map((spot) => [spot.id, spot]));
+
+  for (const row of data || []) {
+    const existing = localById.get(row.id);
+    const cloudUpdatedAt = new Date(row.updated_at || row.created_at).getTime();
+    const localSyncedAt = existing?.syncedAt ? new Date(existing.syncedAt).getTime() : 0;
+    if (existing && localSyncedAt >= cloudUpdatedAt) continue;
+
+    await putSpot(await cloudRowToSpot(row, existing));
+  }
+}
+
+async function uploadSpotToCloud(spot) {
+  const id = spot.id || crypto.randomUUID();
+  const photoPath = spot.photo ? await uploadSpotFile("poi-photos", currentUser.id, id, spot.photo, "photo") : spot.photoPath || null;
+  const audioPath = spot.audio ? await uploadSpotFile("poi-audio", currentUser.id, id, spot.audio, "audio") : spot.audioPath || null;
+
+  const row = {
+    id,
+    user_id: currentUser.id,
+    title: spot.title || "Coin sans nom",
+    category: spot.category || "autre",
+    latitude: spot.latitude,
+    longitude: spot.longitude,
+    commune: spot.commune || null,
+    date: spot.date ? new Date(spot.date).toISOString() : new Date().toISOString(),
+    comment: spot.comment || null,
+    photo_path: photoPath,
+    audio_path: audioPath,
+    created_at: spot.createdAt || new Date().toISOString()
+  };
+
+  const { data, error } = await supabase
+    .from("pois")
+    .upsert(row)
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  return {
+    ...spot,
+    id,
+    userId: currentUser.id,
+    photoPath,
+    audioPath,
+    syncedAt: data.updated_at || new Date().toISOString()
+  };
+}
+
+async function uploadSpotFile(bucket, userId, spotId, blob, prefix) {
+  const extension = extensionFromType(blob.type, prefix);
+  const path = `${userId}/${spotId}/${prefix}.${extension}`;
+  const { error } = await supabase.storage.from(bucket).upload(path, blob, {
+    cacheControl: "3600",
+    upsert: true,
+    contentType: blob.type || "application/octet-stream"
+  });
+
+  if (error) throw error;
+  return path;
+}
+
+async function cloudRowToSpot(row, existing) {
+  return {
+    ...existing,
+    id: row.id,
+    userId: row.user_id,
+    title: row.title || "Coin sans nom",
+    category: row.category || "autre",
+    latitude: row.latitude,
+    longitude: row.longitude,
+    commune: row.commune || "",
+    date: toDatetimeLocal(row.date),
+    comment: row.comment || "",
+    photo: existing?.photo || await downloadSpotFile("poi-photos", row.photo_path),
+    audio: existing?.audio || await downloadSpotFile("poi-audio", row.audio_path),
+    photoPath: row.photo_path,
+    audioPath: row.audio_path,
+    createdAt: row.created_at || existing?.createdAt || new Date().toISOString(),
+    syncedAt: row.updated_at || row.created_at || new Date().toISOString()
+  };
+}
+
+async function downloadSpotFile(bucket, path) {
+  if (!path) return null;
+  const { data, error } = await supabase.storage.from(bucket).download(path);
+  if (error) return null;
+  return data;
+}
+
+function getCredentials() {
+  const email = elements.emailInput.value.trim();
+  const password = elements.passwordInput.value;
+
+  if (!email || !password) {
+    setAuthStatus("Email et mot de passe nécessaires");
+    return null;
+  }
+
+  if (password.length < 6) {
+    setAuthStatus("Mot de passe : 6 caractères minimum");
+    return null;
+  }
+
+  return { email, password };
+}
+
+function setAuthStatus(message) {
+  elements.authStatus.textContent = message;
+}
+
+function setSignedInUi(user) {
+  elements.authForm.hidden = Boolean(user);
+  elements.signedInPanel.hidden = !user;
+  elements.userEmail.textContent = user?.email || "";
 }
 
 function openDb() {
@@ -240,6 +489,14 @@ async function saveSpot(event) {
   };
 
   await putSpot(spot);
+  if (currentUser) {
+    try {
+      await putSpot(await uploadSpotToCloud(spot));
+      setAuthStatus("POI sauvegardé et synchronisé");
+    } catch {
+      setAuthStatus("POI sauvegardé localement, synchronisation en attente");
+    }
+  }
   await loadSpots();
   resetForm();
   switchView("spotsView");
@@ -310,6 +567,7 @@ function renderSpots() {
 
     deleteButton.addEventListener("click", async () => {
       if (!confirm(`Supprimer "${spot.title}" ?`)) return;
+      await deleteCloudSpot(spot);
       await deleteSpot(spot.id);
       await loadSpots();
     });
@@ -333,16 +591,31 @@ async function importSpots() {
   const data = Array.isArray(parsed) ? parsed : [parsed];
 
   for (const rawSpot of data) {
-    await putSpot({
+    const spot = {
       ...rawSpot,
       category: rawSpot.category || "autre",
       commune: rawSpot.commune || "",
       photo: rawSpot.photo ? dataUrlToBlob(rawSpot.photo) : null,
       audio: rawSpot.audio ? dataUrlToBlob(rawSpot.audio) : null
-    });
+    };
+
+    await putSpot(spot);
+    if (currentUser) {
+      try {
+        await putSpot(await uploadSpotToCloud(spot));
+      } catch {
+        setAuthStatus("Import local terminé, synchronisation partielle");
+      }
+    }
   }
   elements.importInput.value = "";
   await loadSpots();
+}
+
+async function deleteCloudSpot(spot) {
+  if (!supabase || !currentUser || spot.userId !== currentUser.id) return;
+  const { error } = await supabase.from("pois").delete().eq("id", spot.id);
+  if (error) setAuthStatus("Suppression cloud impossible, suppression locale effectuée");
 }
 
 async function shareSpot(spot) {
@@ -440,6 +713,29 @@ function safeFileName(value) {
     .replace(/[^a-z0-9.-]+/gi, "-")
     .replace(/^-+|-+$/g, "")
     .toLowerCase();
+}
+
+function extensionFromType(type, fallback) {
+  const known = {
+    "image/jpeg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp",
+    "image/heic": "heic",
+    "audio/mpeg": "mp3",
+    "audio/mp4": "m4a",
+    "audio/webm": "webm",
+    "audio/wav": "wav"
+  };
+
+  return known[type] || (fallback === "audio" ? "webm" : "bin");
+}
+
+function toDatetimeLocal(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+  return date.toISOString().slice(0, 16);
 }
 
 function dataUrlToBlob(dataUrl) {
