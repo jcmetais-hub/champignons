@@ -1,2 +1,2 @@
-export const SUPABASE_URL = "";
-export const SUPABASE_ANON_KEY = "";
+export const SUPABASE_URL = "https://dhafvuxywfbwhmuljikl.supabase.co";
+export const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRoYWZ2dXh5d2Zid2htdWxqaWtsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxMDE5MjEsImV4cCI6MjA5MjY3NzkyMX0.3PtmN8SHhqvrEp-zhzDyN2wLSwSkEPb8g7tYMYeO2zU";
