@@ -3,6 +3,7 @@
 Application web installable pour enregistrer des POI de cueillette avec :
 
 - coordonnées GPS ;
+- commune récupérée automatiquement lors de la localisation ;
 - photo ;
 - date ;
 - commentaire ;
@@ -44,6 +45,10 @@ Les données restent stockées localement dans Safari sur l'iPhone. Utiliser le 
 Dans "Mes coins", utiliser le bouton "Partager" du POI. Sur iPhone, la feuille de partage permet de choisir Mail et d'envoyer un fichier JSON du point.
 
 Le destinataire peut ensuite utiliser le bouton d'import dans son application pour récupérer le POI, avec la catégorie, la photo et le mémo vocal si présents.
+
+## Commune automatique
+
+Quand la position GPS est capturée, l'application tente de retrouver la commune à partir des coordonnées. Cette recherche nécessite une connexion réseau. Si la commune n'est pas trouvée, le champ reste modifiable manuellement.
 
 ## Fichiers
 

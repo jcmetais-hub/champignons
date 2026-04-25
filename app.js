@@ -12,6 +12,7 @@ const elements = {
   categoryInput: document.querySelector("#categoryInput"),
   latInput: document.querySelector("#latInput"),
   lngInput: document.querySelector("#lngInput"),
+  communeInput: document.querySelector("#communeInput"),
   dateInput: document.querySelector("#dateInput"),
   photoInput: document.querySelector("#photoInput"),
   photoPreview: document.querySelector("#photoPreview"),
@@ -159,6 +160,7 @@ function capturePosition() {
       elements.latInput.value = latitude.toFixed(6);
       elements.lngInput.value = longitude.toFixed(6);
       elements.positionStatus.textContent = `Position capturée, précision ${Math.round(accuracy)} m`;
+      fillCommune(latitude, longitude);
     },
     () => {
       elements.positionStatus.textContent = "Impossible de récupérer la position";
@@ -229,6 +231,7 @@ async function saveSpot(event) {
     category: elements.categoryInput.value,
     latitude,
     longitude,
+    commune: elements.communeInput.value.trim(),
     date: elements.dateInput.value,
     comment: elements.commentInput.value.trim(),
     photo: photoBlob,
@@ -260,7 +263,7 @@ function renderSpots() {
   const selectedCategory = elements.categoryFilter.value;
   const filtered = spots.filter((spot) => {
     const category = spot.category || "autre";
-    const text = `${spot.title} ${categoryLabels[category]} ${spot.comment} ${formatDate(spot.date)} ${spot.latitude} ${spot.longitude}`.toLowerCase();
+    const text = `${spot.title} ${categoryLabels[category]} ${spot.commune || ""} ${spot.comment} ${formatDate(spot.date)} ${spot.latitude} ${spot.longitude}`.toLowerCase();
     return text.includes(query) && (selectedCategory === "all" || category === selectedCategory);
   });
 
@@ -283,7 +286,7 @@ function renderSpots() {
 
     const categoryValue = spot.category || "autre";
     title.textContent = spot.title;
-    meta.textContent = `${formatDate(spot.date)} • ${spot.latitude.toFixed(6)}, ${spot.longitude.toFixed(6)}`;
+    meta.textContent = `${formatDate(spot.date)} • ${spot.commune ? `${spot.commune} • ` : ""}${spot.latitude.toFixed(6)}, ${spot.longitude.toFixed(6)}`;
     category.textContent = categoryLabels[categoryValue] || categoryLabels.autre;
     comment.textContent = spot.comment || "Aucun commentaire";
 
@@ -333,6 +336,7 @@ async function importSpots() {
     await putSpot({
       ...rawSpot,
       category: rawSpot.category || "autre",
+      commune: rawSpot.commune || "",
       photo: rawSpot.photo ? dataUrlToBlob(rawSpot.photo) : null,
       audio: rawSpot.audio ? dataUrlToBlob(rawSpot.audio) : null
     });
@@ -351,7 +355,7 @@ async function shareSpot(spot) {
   const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(destination)}`;
   const shareData = {
     title: `POI champignon - ${spot.title}`,
-    text: `${spot.title} (${categoryLabels[spot.category || "autre"]})\n${formatDate(spot.date)}\n${mapsUrl}`,
+    text: `${spot.title} (${categoryLabels[spot.category || "autre"]})\n${spot.commune ? `${spot.commune}\n` : ""}${formatDate(spot.date)}\n${mapsUrl}`,
     files: [file]
   };
 
@@ -361,7 +365,46 @@ async function shareSpot(spot) {
   }
 
   downloadBlob(blob, fileName);
-  window.location.href = `mailto:?subject=${encodeURIComponent(`POI champignon - ${spot.title}`)}&body=${encodeURIComponent(`J'ai exporté un POI depuis l'application Coins Champignons.\n\n${spot.title}\nType : ${categoryLabels[spot.category || "autre"]}\nCarte : ${mapsUrl}\n\nJoins le fichier JSON téléchargé à ce mail pour que le destinataire puisse l'importer.`)}`;
+  window.location.href = `mailto:?subject=${encodeURIComponent(`POI champignon - ${spot.title}`)}&body=${encodeURIComponent(`J'ai exporté un POI depuis l'application Coins Champignons.\n\n${spot.title}\nType : ${categoryLabels[spot.category || "autre"]}\nCommune : ${spot.commune || "non renseignée"}\nCarte : ${mapsUrl}\n\nJoins le fichier JSON téléchargé à ce mail pour que le destinataire puisse l'importer.`)}`;
+}
+
+async function fillCommune(latitude, longitude) {
+  elements.communeInput.placeholder = "Recherche de la commune...";
+
+  try {
+    const commune = await reverseGeocodeCommune(latitude, longitude);
+    elements.communeInput.value = commune || "";
+    elements.communeInput.placeholder = commune ? "Commune" : "Commune introuvable, à saisir";
+  } catch {
+    elements.communeInput.placeholder = "Commune indisponible, à saisir";
+  }
+}
+
+async function reverseGeocodeCommune(latitude, longitude) {
+  const bigDataUrl = new URL("https://api.bigdatacloud.net/data/reverse-geocode-client");
+  bigDataUrl.searchParams.set("latitude", latitude);
+  bigDataUrl.searchParams.set("longitude", longitude);
+  bigDataUrl.searchParams.set("localityLanguage", "fr");
+
+  const bigDataResponse = await fetch(bigDataUrl);
+  if (bigDataResponse.ok) {
+    const data = await bigDataResponse.json();
+    const commune = data.city || data.locality || data.localityInfo?.administrative?.find((item) => item.adminLevel >= 7)?.name;
+    if (commune) return commune;
+  }
+
+  const nominatimUrl = new URL("https://nominatim.openstreetmap.org/reverse");
+  nominatimUrl.searchParams.set("format", "jsonv2");
+  nominatimUrl.searchParams.set("lat", latitude);
+  nominatimUrl.searchParams.set("lon", longitude);
+  nominatimUrl.searchParams.set("zoom", "10");
+  nominatimUrl.searchParams.set("accept-language", "fr");
+
+  const nominatimResponse = await fetch(nominatimUrl);
+  if (!nominatimResponse.ok) return "";
+  const data = await nominatimResponse.json();
+  const address = data.address || {};
+  return address.city || address.town || address.village || address.municipality || address.county || "";
 }
 
 function blobToDataUrl(blob) {
