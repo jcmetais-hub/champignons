@@ -90,7 +90,7 @@ function bindEvents() {
   elements.categoryFilter.addEventListener("change", renderSpots);
   elements.exportButton.addEventListener("click", exportSpots);
   elements.importInput.addEventListener("change", importSpots);
-  elements.connectionStatus.addEventListener("click", () => switchView("accountView"));
+  elements.connectionStatus?.addEventListener("click", () => switchView("accountView"));
   elements.signInButton.addEventListener("click", signIn);
   elements.signUpButton.addEventListener("click", signUp);
   elements.signOutButton.addEventListener("click", signOut);
@@ -424,6 +424,7 @@ function updateConnectionStatus() {
 }
 
 function setConnectionStatus(status, text, title) {
+  if (!elements.connectionStatus || !elements.connectionStatusText) return;
   elements.connectionStatus.className = `status-pill is-${status}`;
   elements.connectionStatusText.textContent = text;
   elements.connectionStatus.title = title;
